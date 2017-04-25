@@ -31,13 +31,9 @@ https://arxiv.org/pdf/1605.07146v1.pdf
 
 <b>Results:</b>
 
-<left>
 ![Precisions](g3doc/cifar_resnet.gif)
-</left>
-<left>
-![Precisions Legends](g3doc/cifar_resnet_legends.gif)
-</left>
 
+![Precisions Legends](g3doc/cifar_resnet_legends.gif)
 
 CIFAR-10 Model|Best Precision|Steps
 --------------|--------------|------
