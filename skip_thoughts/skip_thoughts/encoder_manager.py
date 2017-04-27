@@ -48,6 +48,7 @@ class EncoderManager(object):
 
   def load_model(self, model_config, vocabulary_file, embedding_matrix_file,
                  checkpoint_path):
+      # TODO: modify to use multilingual skipthoughts
     """Loads a skip-thoughts model.
 
     Args:

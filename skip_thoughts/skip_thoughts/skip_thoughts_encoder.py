@@ -101,6 +101,7 @@ class SkipThoughtsEncoder(object):
       embeddings: Dictionary of word to embedding vector (1D numpy array).
     """
     # need per-language detector
+    # **new**: necessary?
     self._sentence_detector = {'<da>': nltk.data.load("tokenizers/punkt/danish.pickle"),
                                '<de>': nltk.data.load("tokenizers/punkt/german.pickle"),
                                '<en>': nltk.data.load("tokenizers/punkt/english.pickle"),
@@ -217,12 +218,10 @@ class SkipThoughtsEncoder(object):
     """
     preprocessed_data = []
     for item in data:
-      lang
+      pdb.set_trace()
       tokenized = self._tokenize(item)
       if use_eos:
         tokenized.append(special_words.EOS)
-      pdb.set_trace()
-
       preprocessed_data.append([self._word_to_embedding(w) for w in tokenized])
     return preprocessed_data
 

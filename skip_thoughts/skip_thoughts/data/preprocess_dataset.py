@@ -123,6 +123,7 @@ def _build_vocabularies():
             word = line.decode('utf-8').strip()
             if word in vocab:
                 # Kludge: what is happening during conversion to cause this?
+                # We lost no more than 7 words this way, only in some languages
                 "Attempting to add word twice: %sl" % word
             else:
                 vocab[word] = i
@@ -271,11 +272,11 @@ def main(unused_argv):
   dataset = []
   for filename in input_files:
     lang = filename.split(os.sep)[-1]
-    pdb.set_trace()
     dataset.extend(_process_input_file(filename, vocabs[lang], stats))
     if FLAGS.max_sentences and stats["sentences_output"] >= FLAGS.max_sentences:
       break
 
+  pdb.set_trace()
   tf.logging.info("Generated dataset with %d sentences.", len(dataset))
   for k, v in stats.items():
     tf.logging.info("%s: %d", k, v)

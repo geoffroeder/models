@@ -128,6 +128,7 @@ class SkipThoughtsModel(object):
       decode_pre_mask = None
       decode_post_mask = None
     else:
+        # **new: MODE = TRAIN
       # Prefetch serialized tf.Example protos.
       input_queue = input_ops.prefetch_input_data(
           self.reader,
@@ -137,6 +138,7 @@ class SkipThoughtsModel(object):
           num_reader_threads=self.config.num_input_reader_threads)
 
       # Deserialize a batch.
+      # Develop mask here based on language
       serialized = input_queue.dequeue_many(self.config.batch_size)
       encode, decode_pre, decode_post = input_ops.parse_example_batch(
           serialized)
@@ -289,12 +291,15 @@ class SkipThoughtsModel(object):
           initial_state=initial_state,
           scope=scope)
 
+    # Idea: produce language mask for each batch. Contribute loss from each
+    # language loss function
+
     # Stack batch vertically.
     decoder_output = tf.reshape(decoder_output, [-1, self.config.encoder_dim])
     targets = tf.reshape(targets, [-1])
     weights = tf.to_float(tf.reshape(mask, [-1]))
 
-    # Logits.
+    # Logits. # TODO: duplicate these layes. 8, 1 for each language
     with tf.variable_scope("logits", reuse=reuse_logits) as scope:
       logits = tf.contrib.layers.fully_connected(
           inputs=decoder_output,

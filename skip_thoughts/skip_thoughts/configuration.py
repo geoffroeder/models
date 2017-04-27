@@ -60,6 +60,7 @@ def model_config(input_file_pattern=None,
   config.num_input_reader_threads = num_input_reader_threads
   config.shuffle_input_data = shuffle_input_data
   config.uniform_init_scale = uniform_init_scale
+  # TODO: this should be a dictionary
   config.vocab_size = vocab_size
   config.batch_size = batch_size
   config.word_embedding_dim = word_embedding_dim
