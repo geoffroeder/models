@@ -118,14 +118,15 @@ def _build_vocabularies():
         assert vocab_file in VALID_LANGS, "File named %s unexpected!" % vocab_file
         print("Working on %s" % vocab_file)
         vocab = vocabs[vocab_file] # name is index
-        pdb.set_trace()
         with tf.gfile.GFile(FLAGS.vocabs_dir + vocab_file, mode="r") as f:
           for i, line in enumerate(f):
             word = line.decode('utf-8').strip()
-            assert word not in vocab, "Attempting to add word twice: %sl" % word
-            vocab[word] = i
+            if word in vocab:
+                # Kludge: what is happening during conversion to cause this?
+                "Attempting to add word twice: %sl" % word
+            else:
+                vocab[word] = i
         tf.logging.info("Read vocab of size %d from %s", len(vocab), vocab_file)
-    pdb.set_trace()
     return vocabs
 
   assert False, "Something went wrong with loading FLAGS.vocabs_dir!"
@@ -194,7 +195,7 @@ def _process_input_file(filename, vocab, stats):
       else:
         # USE CORRECT VOCAB here
         serialized = _create_serialized_example(predecessor, current, successor,
-                                                vocab[language_tag])
+                                                vocab)
         processed.append(serialized)
         stats.update(["sentences_output"])
 
