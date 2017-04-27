@@ -178,7 +178,8 @@ class SkipThoughtsModel(object):
       # No sequences to decode.
       decode_pre_emb = None
       decode_post_emb = None
-    else:
+      # MODIFY HERE
+    else: # mode is "train" or "eval"
       word_emb = tf.get_variable(
           name="word_embedding",
           shape=[self.config.vocab_size, self.config.word_embedding_dim],
@@ -267,7 +268,7 @@ class SkipThoughtsModel(object):
       embeddings: Batch of sentences to decode; a float32 Tensor with shape
         [batch_size, padded_length, emb_dim].
       targets: Batch of target word ids; an int64 Tensor with shape
-        [batch_size, padded_length].
+        [batch_size, padded_length]. # TODO: modify this 
       mask: A 0/1 Tensor with shape [batch_size, padded_length].
       initial_state: Initial state of the GRU. A float32 Tensor with shape
         [batch_size, num_gru_cells].

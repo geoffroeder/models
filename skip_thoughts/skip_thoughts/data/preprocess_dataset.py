@@ -38,6 +38,8 @@ from __future__ import print_function
 import collections
 import os
 
+#** NEW: debug **
+import pdb
 
 import numpy as np
 import tensorflow as tf
@@ -55,6 +57,12 @@ tf.flags.DEFINE_string("input_files", None,
 tf.flags.DEFINE_string("vocab_file", "",
                        "(Optional) existing vocab file. Otherwise, a new vocab "
                        "file is created and written to the output directory. "
+                       "The file format is a list of newline-separated words, "
+                       "where the word id is the corresponding 0-based index "
+                       "in the file.")
+
+tf.flags.DEFINE_string("vocabs_dir", None,
+                       "Directory of existing vocab files."
                        "The file format is a list of newline-separated words, "
                        "where the word id is the corresponding 0-based index "
                        "in the file.")
@@ -86,65 +94,41 @@ tf.flags.DEFINE_boolean("add_eos", True,
 tf.logging.set_verbosity(tf.logging.INFO)
 
 
-def _build_vocabulary(input_files):
-  """Loads or builds the model vocabulary.
+def _build_vocabularies():
+  """Loads the model vocabularies.
 
   Args:
-    input_files: List of pre-tokenized input .txt files.
+    None
 
   Returns:
-    vocab: A dictionary of word to id.
+    vocabs: A **NEW: dictionary of language-tag to** dictionary of word to id.
   """
-  if FLAGS.vocab_file:
-    tf.logging.info("Loading existing vocab file.")
-    vocab = collections.OrderedDict()
-    with tf.gfile.GFile(FLAGS.vocab_file, mode="r") as f:
-      for i, line in enumerate(f):
-        word = line.decode("utf-8").strip()
-        assert word not in vocab, "Attempting to add word twice: %s" % word
-        vocab[word] = i
-    tf.logging.info("Read vocab of size %d from %s",
-                    len(vocab), FLAGS.vocab_file)
-    return vocab
 
-  tf.logging.info("Creating vocabulary.")
-  num = 0
-  wordcount = collections.Counter()
-  for input_file in input_files:
-    tf.logging.info("Processing file: %s", input_file)
-    for sentence in tf.gfile.FastGFile(input_file):
-      wordcount.update(sentence.split())
+  # ** NEW **
+  # Kludge: add this to FLAGS
+  VALID_LANGS = {'en', 'fr', 'da', 'de', 'sv', 'it', 'pt', 'es'}
+  # ** NEW **
+  if FLAGS.vocabs_dir: # HYP: set this flag with env variable in bash script
+    tf.logging.info("Loading existing set of vocab files from %s." % FLAGS.vocabs_dir)
+    vocabs = {l: collections.OrderedDict() for l in VALID_LANGS}
+    # ** NEW **
+    for _, _, vocab_files in os.walk(FLAGS.vocabs_dir): # assume no subdirectories
+      for vocab_file in vocab_files:
+        # ** NEW **
+        assert vocab_file in VALID_LANGS, "File named %s unexpected!" % vocab_file
+        print("Working on %s" % vocab_file)
+        vocab = vocabs[vocab_file] # name is index
+        pdb.set_trace()
+        with tf.gfile.GFile(FLAGS.vocabs_dir + vocab_file, mode="r") as f:
+          for i, line in enumerate(f):
+            word = line.decode('utf-8').strip()
+            assert word not in vocab, "Attempting to add word twice: %sl" % word
+            vocab[word] = i
+        tf.logging.info("Read vocab of size %d from %s", len(vocab), vocab_file)
+    pdb.set_trace()
+    return vocabs
 
-      num += 1
-      if num % 1000000 == 0:
-        tf.logging.info("Processed %d sentences", num)
-
-  tf.logging.info("Processed %d sentences total", num)
-
-  words = wordcount.keys()
-  freqs = wordcount.values()
-  sorted_indices = np.argsort(freqs)[::-1]
-
-  vocab = collections.OrderedDict()
-  vocab[special_words.EOS] = special_words.EOS_ID
-  vocab[special_words.UNK] = special_words.UNK_ID
-  for w_id, w_index in enumerate(sorted_indices[0:FLAGS.num_words - 2]):
-    vocab[words[w_index]] = w_id + 2  # 0: EOS, 1: UNK.
-
-  tf.logging.info("Created vocab with %d words", len(vocab))
-
-  vocab_file = os.path.join(FLAGS.output_dir, "vocab.txt")
-  with tf.gfile.FastGFile(vocab_file, "w") as f:
-    f.write("\n".join(vocab.keys()))
-  tf.logging.info("Wrote vocab file to %s", vocab_file)
-
-  word_counts_file = os.path.join(FLAGS.output_dir, "word_counts.txt")
-  with tf.gfile.FastGFile(word_counts_file, "w") as f:
-    for i in sorted_indices:
-      f.write("%s %d\n" % (words[i], freqs[i]))
-  tf.logging.info("Wrote word counts file to %s", word_counts_file)
-
-  return vocab
+  assert False, "Something went wrong with loading FLAGS.vocabs_dir!"
 
 
 def _int64_feature(value):
@@ -177,7 +161,7 @@ def _process_input_file(filename, vocab, stats):
 
   Args:
     filename: Path to a pre-tokenized input .txt file.
-    vocab: A dictionary of word to id.
+    vocab: A **new: dictionary of language-tag to** dictionary of word to id.
     stats: A Counter object for statistics.
 
   Returns:
@@ -193,6 +177,8 @@ def _process_input_file(filename, vocab, stats):
   for successor_str in tf.gfile.FastGFile(filename):
     stats.update(["sentences_seen"])
     successor = successor_str.split()
+    #**new:  access correct language dictionary**
+    language_tag = successor[0]
 
     # The first 2 sentences per file will be skipped.
     if predecessor and current and successor:
@@ -206,8 +192,9 @@ def _process_input_file(filename, vocab, stats):
           FLAGS.max_sentence_length):
         stats.update(["sentences_too_long"])
       else:
+        # USE CORRECT VOCAB here
         serialized = _create_serialized_example(predecessor, current, successor,
-                                                vocab)
+                                                vocab[language_tag])
         processed.append(serialized)
         stats.update(["sentences_output"])
 
@@ -258,6 +245,8 @@ def _write_dataset(name, dataset, indices, num_shards):
 def main(unused_argv):
   if not FLAGS.input_files:
     raise ValueError("--input_files is required.")
+  if not FLAGS.vocabs_dir:
+    raise ValueError("--vocabs_dir is required.")
   if not FLAGS.output_dir:
     raise ValueError("--output_dir is required.")
 
@@ -266,19 +255,23 @@ def main(unused_argv):
 
   input_files = []
   for pattern in FLAGS.input_files.split(","):
-    match = tf.gfile.Glob(FLAGS.input_files)
+    match = tf.gfile.Glob(pattern)
     if not match:
       raise ValueError("Found no files matching %s" % pattern)
     input_files.extend(match)
   tf.logging.info("Found %d input files.", len(input_files))
 
-  vocab = _build_vocabulary(input_files)
+  # **new: this is a dictionary of language tag to dictionary of word to id
+  # vocab = _build_vocabulary(input_files)
+  vocabs = _build_vocabularies()
 
   tf.logging.info("Generating dataset.")
   stats = collections.Counter()
   dataset = []
   for filename in input_files:
-    dataset.extend(_process_input_file(filename, vocab, stats))
+    lang = filename.split(os.sep)[-1]
+    pdb.set_trace()
+    dataset.extend(_process_input_file(filename, vocabs[lang], stats))
     if FLAGS.max_sentences and stats["sentences_output"] >= FLAGS.max_sentences:
       break
 
@@ -298,4 +291,4 @@ def main(unused_argv):
 
 
 if __name__ == "__main__":
-  tf.app.run()
+  tf.app.run()# It's just a very quick wrapper that handles flag parsing and then dispatches to your own main

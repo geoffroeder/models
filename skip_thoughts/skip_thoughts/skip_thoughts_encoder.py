@@ -39,7 +39,7 @@ import tensorflow as tf
 
 from skip_thoughts import skip_thoughts_model
 from skip_thoughts.data import special_words
-
+import pdb
 
 def _pad(seq, target_len):
   """Pads a sequence of word embeddings up to the target length.
@@ -100,7 +100,17 @@ class SkipThoughtsEncoder(object):
     Args:
       embeddings: Dictionary of word to embedding vector (1D numpy array).
     """
-    self._sentence_detector = nltk.data.load("tokenizers/punkt/english.pickle")
+    # need per-language detector
+    self._sentence_detector = {'<da>': nltk.data.load("tokenizers/punkt/danish.pickle"),
+                               '<de>': nltk.data.load("tokenizers/punkt/german.pickle"),
+                               '<en>': nltk.data.load("tokenizers/punkt/english.pickle"),
+                               '<es>': nltk.data.load("tokenizers/punkt/spanish.pickle"),
+                               '<fr>': nltk.data.load("tokenizers/punkt/french.pickle"),
+                               '<it>': nltk.data.load("tokenizers/punkt/italian.pickle"),
+                               '<sv>': nltk.data.load("tokenizers/punkt/swedish.pickle"),
+                               '<pt>': nltk.data.load("tokenizers/punkt/portuguese.pickle")}
+    # fasttext.load_model("/ais/gobi5/roeder/fastText/wiki.en.bin")
+    # embeddings should be a dict like _sentence_detector
     self._embeddings = embeddings
 
   def _create_restore_fn(self, checkpoint_path, saver):
@@ -187,11 +197,11 @@ class SkipThoughtsEncoder(object):
     tokenized = []
     for s in self._sentence_detector.tokenize(item):
       tokenized.extend(nltk.tokenize.word_tokenize(s))
-
     return tokenized
 
   def _word_to_embedding(self, w):
     """Returns the embedding of a word."""
+    # retrieve from dictionary or retrieve UNK for unknown
     return self._embeddings.get(w, self._embeddings[special_words.UNK])
 
   def _preprocess(self, data, use_eos):
@@ -207,9 +217,12 @@ class SkipThoughtsEncoder(object):
     """
     preprocessed_data = []
     for item in data:
+      lang
       tokenized = self._tokenize(item)
       if use_eos:
         tokenized.append(special_words.EOS)
+      pdb.set_trace()
+
       preprocessed_data.append([self._word_to_embedding(w) for w in tokenized])
     return preprocessed_data
 
@@ -235,6 +248,7 @@ class SkipThoughtsEncoder(object):
       thought_vectors: A list of numpy arrays corresponding to the skip-thought
         encodings of sentences in 'data'.
     """
+    pdb.set_trace()
     data = self._preprocess(data, use_eos)
     thought_vectors = []
 
@@ -249,6 +263,8 @@ class SkipThoughtsEncoder(object):
           "encode_emb:0": embeddings,
           "encode_mask:0": mask,
       }
+      # this is where the sentences are actually encoded. then each sentence has its
+      # encoded representation
       thought_vectors.extend(
           sess.run("encoder/thought_vectors:0", feed_dict=feed_dict))
 
