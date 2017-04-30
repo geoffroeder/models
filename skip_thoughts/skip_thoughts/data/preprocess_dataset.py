@@ -19,6 +19,10 @@ Each Example proto in the output contains the following fields:
   decode_pre: list of int64 ids corresponding to the "previous" sentence.
   encode: list of int64 ids corresponding to the "current" sentence.
   decode_post: list of int64 ids corresponding to the "post" sentence.
+  **new**
+  id_to_lang = {'en': 0, 'fr': 1, 'de': 2, 'es': 3, 'it': 4, 'da': 5, 'pt': 6,
+                'sv': 7}
+  target_lang: int64 id corresponding to the target language
 
 In addition, the following files are generated:
 
@@ -138,7 +142,6 @@ def _int64_feature(value):
   return tf.train.Feature(int64_list=tf.train.Int64List(
       value=[int(v) for v in value]))
 
-
 def _sentence_to_ids(sentence, vocab):
   """Helper for converting a sentence (list of words) to a list of ids."""
   ids = [vocab.get(w, special_words.UNK_ID) for w in sentence]
@@ -147,18 +150,20 @@ def _sentence_to_ids(sentence, vocab):
   return ids
 
 
-def _create_serialized_example(predecessor, current, successor, vocab):
+def _create_serialized_example(predecessor, current, successor, vocab, lang_id):
   """Helper for creating a serialized Example proto."""
   example = tf.train.Example(features=tf.train.Features(feature={
       "decode_pre": _int64_feature(_sentence_to_ids(predecessor, vocab)),
       "encode": _int64_feature(_sentence_to_ids(current, vocab)),
       "decode_post": _int64_feature(_sentence_to_ids(successor, vocab)),
+      "target_lang": _int64_feature([lang_id])
   }))
 
   return example.SerializeToString()
 
-
-def _process_input_file(filename, vocab, stats):
+# ** new: accepts lang parameter
+def _process_input_file(filename, vocab, stats, lang_id):
+    # TODO: still need to modify?
   """Processes the sentences in an input file.
 
   Args:
@@ -179,8 +184,6 @@ def _process_input_file(filename, vocab, stats):
   for successor_str in tf.gfile.FastGFile(filename):
     stats.update(["sentences_seen"])
     successor = successor_str.split()
-    #**new:  access correct language dictionary**
-    language_tag = successor[0]
 
     # The first 2 sentences per file will be skipped.
     if predecessor and current and successor:
@@ -194,9 +197,9 @@ def _process_input_file(filename, vocab, stats):
           FLAGS.max_sentence_length):
         stats.update(["sentences_too_long"])
       else:
-        # USE CORRECT VOCAB here
+        # ** new: passes lang variable to function
         serialized = _create_serialized_example(predecessor, current, successor,
-                                                vocab)
+                                                vocab, lang_id)
         processed.append(serialized)
         stats.update(["sentences_output"])
 
@@ -266,17 +269,18 @@ def main(unused_argv):
   # **new: this is a dictionary of language tag to dictionary of word to id
   # vocab = _build_vocabulary(input_files)
   vocabs = _build_vocabularies()
-
+  lang_to_id = {'en': 0, 'fr': 1, 'de': 2, 'es': 3, 'it': 4, 'da': 5, 'pt': 6,
+                'sv': 7}
   tf.logging.info("Generating dataset.")
   stats = collections.Counter()
   dataset = []
   for filename in input_files:
     lang = filename.split(os.sep)[-1]
-    dataset.extend(_process_input_file(filename, vocabs[lang], stats))
+    dataset.extend(_process_input_file(filename, vocabs[lang], stats,
+                                       lang_to_id[lang]))
     if FLAGS.max_sentences and stats["sentences_output"] >= FLAGS.max_sentences:
       break
 
-  pdb.set_trace()
   tf.logging.info("Generated dataset with %d sentences.", len(dataset))
   for k, v in stats.items():
     tf.logging.info("%s: %d", k, v)

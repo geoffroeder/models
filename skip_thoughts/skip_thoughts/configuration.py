@@ -31,7 +31,7 @@ def model_config(input_file_pattern=None,
                  uniform_init_scale=0.1,
                  vocab_size=20000,
                  batch_size=128,
-                 word_embedding_dim=620,
+                 word_embedding_dim=620, # TODO: should be 300
                  bidirectional_encoder=False,
                  encoder_dim=2400):
   """Creates a model configuration object.

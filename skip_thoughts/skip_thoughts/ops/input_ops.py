@@ -23,12 +23,14 @@ import collections
 
 import tensorflow as tf
 
+# ** new: include language information
 # A SentenceBatch is a pair of Tensors:
+#  lang: an uint8 tensor of size [batch_size, 1] for distinguishing languages
 #  ids: Batch of input sentences represented as sequences of word ids: an int64
 #    Tensor with shape [batch_size, padded_length].
 #  mask: Boolean mask distinguishing real words (1) from padded words (0): an
 #    int32 Tensor with shape [batch_size, padded_length].
-SentenceBatch = collections.namedtuple("SentenceBatch", ("ids", "mask"))
+SentenceBatch = collections.namedtuple("SentenceBatch", ("ids", "mask", "langs"))
 
 
 def parse_example_batch(serialized):
@@ -40,6 +42,7 @@ def parse_example_batch(serialized):
     encode: A SentenceBatch of encode sentences.
     decode_pre: A SentenceBatch of "previous" sentences to decode.
     decode_post: A SentenceBatch of "post" sentences to decode.
+    target_lang: A SentenceBatch of lang_id numbers for output prediction
   """
   features = tf.parse_example(
       serialized,
@@ -47,15 +50,17 @@ def parse_example_batch(serialized):
           "encode": tf.VarLenFeature(dtype=tf.int64),
           "decode_pre": tf.VarLenFeature(dtype=tf.int64),
           "decode_post": tf.VarLenFeature(dtype=tf.int64),
+          "target_lang":  tf.VarLenFeature(dtype=tf.int64)
       })
 
   def _sparse_to_batch(sparse):
     ids = tf.sparse_tensor_to_dense(sparse)  # Padding with zeroes.
     mask = tf.sparse_to_dense(sparse.indices, sparse.dense_shape,
                               tf.ones_like(sparse.values, dtype=tf.int32))
-    return SentenceBatch(ids=ids, mask=mask)
+    langs = None
+    return SentenceBatch(ids=ids, mask=mask, langs=langs)
 
-  output_names = ("encode", "decode_pre", "decode_post")
+  output_names = ("encode", "decode_pre", "decode_post", "target_lang")
   return tuple(_sparse_to_batch(features[x]) for x in output_names)
 
 
@@ -87,12 +92,13 @@ def prefetch_input_data(reader,
     tf.logging.info("Prefetching values from %d files matching %s",
                     len(data_files), file_pattern)
 
+  # adds all the file names to the graph (training files)
   filename_queue = tf.train.string_input_producer(
       data_files, shuffle=shuffle, capacity=16, name="filename_queue")
 
   if shuffle:
     min_after_dequeue = int(0.6 * capacity)
-    values_queue = tf.RandomShuffleQueue(
+    values_queue = tf.RandomShuffleQueue( # dequeue items in random order not FIFO
         capacity=capacity,
         min_after_dequeue=min_after_dequeue,
         dtypes=[tf.string],
@@ -110,7 +116,7 @@ def prefetch_input_data(reader,
     _, value = reader.read(filename_queue)
     enqueue_ops.append(values_queue.enqueue([value]))
   tf.train.queue_runner.add_queue_runner(
-      tf.train.queue_runner.QueueRunner(values_queue, enqueue_ops))
+      tf.train.queue_runner.QueueRunner(values_queue, enqueue_ops)) # places queues in collection in graph
   tf.summary.scalar("queue/%s/fraction_of_%d_full" % (values_queue.name,
                                                       capacity),
                     tf.cast(values_queue.size(), tf.float32) * (1.0 / capacity))

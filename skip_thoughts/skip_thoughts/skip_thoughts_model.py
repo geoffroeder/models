@@ -57,6 +57,7 @@ class SkipThoughtsModel(object):
     Args:
       config: Object containing configuration parameters.
       mode: "train", "eval" or "encode".
+      # TODO: subclass tf.ReaderBase?
       input_reader: Subclass of tf.ReaderBase for reading the input serialized
         tf.Example protocol buffers. Defaults to TFRecordReader.
 
@@ -140,7 +141,7 @@ class SkipThoughtsModel(object):
       # Deserialize a batch.
       # Develop mask here based on language
       serialized = input_queue.dequeue_many(self.config.batch_size)
-      encode, decode_pre, decode_post = input_ops.parse_example_batch(
+      encode, decode_pre, decode_post, langs = input_ops.parse_example_batch(
           serialized)
 
       encode_ids = encode.ids
@@ -177,7 +178,7 @@ class SkipThoughtsModel(object):
       # been expanded (see vocabulary_expansion.py).
       encode_emb = tf.placeholder(tf.float32, (
           None, None, self.config.word_embedding_dim), "encode_emb")
-      # No sequences to decode.
+      # No sequences to decode
       decode_pre_emb = None
       decode_post_emb = None
       # MODIFY HERE
@@ -261,6 +262,7 @@ class SkipThoughtsModel(object):
 
     self.thought_vectors = thought_vectors
 
+  # **new**: language_mask
   def _build_decoder(self, name, embeddings, targets, mask, initial_state,
                      reuse_logits):
     """Builds a sentence decoder.
@@ -283,16 +285,13 @@ class SkipThoughtsModel(object):
       # prediction of the first word) and remove the last word.
       decoder_input = tf.pad(
           embeddings[:, :-1, :], [[0, 0], [1, 0], [0, 0]], name="input")
-      length = tf.reduce_sum(mask, 1, name="length")
+      length = tf.reduce_sum(mask, 1, name="length") # NOTE: reduce columns, output rows
       decoder_output, _ = tf.nn.dynamic_rnn(
           cell=cell,
           inputs=decoder_input,
           sequence_length=length,
           initial_state=initial_state,
           scope=scope)
-
-    # Idea: produce language mask for each batch. Contribute loss from each
-    # language loss function
 
     # Stack batch vertically.
     decoder_output = tf.reshape(decoder_output, [-1, self.config.encoder_dim])
@@ -335,14 +334,15 @@ class SkipThoughtsModel(object):
       self.target_cross_entropy_loss_weights
     """
     if self.mode != "encode":
+
       # Pre-sentence decoder.
-      self._build_decoder("decoder_pre", self.decode_pre_emb,
-                          self.decode_pre_ids, self.decode_pre_mask,
+      self._build_decoder("decoder_pre", self.decode_pre_emb, # embeddings are the LSTM output
+                          self.decode_pre_ids, self.decode_pre_mask, # NEW ** : produce language mask during data processing
                           self.thought_vectors, False)
 
       # Post-sentence decoder. Logits weights are reused.
       self._build_decoder("decoder_post", self.decode_post_emb,
-                          self.decode_post_ids, self.decode_post_mask,
+                          self.decode_post_ids, self.decode_post_mask, # NEW ** : produce language mask during data processing
                           self.thought_vectors, True)
 
   def build_loss(self):
@@ -368,8 +368,8 @@ class SkipThoughtsModel(object):
   def build(self):
     """Creates all ops for training, evaluation or encoding."""
     self.build_inputs()
-    self.build_word_embeddings()
+    self.build_word_embeddings() # TODO: modify
     self.build_encoder()
-    self.build_decoders()
+    self.build_decoders() # TODO: modify
     self.build_loss()
     self.build_global_step()

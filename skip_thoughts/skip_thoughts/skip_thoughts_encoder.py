@@ -236,7 +236,7 @@ class SkipThoughtsEncoder(object):
 
     Args:
       sess: TensorFlow Session.
-      data: A list of input strings.
+      data: A list of input strings. # WAIT is it input strings or word embeddings??
       use_norm: Whether to normalize skip-thought vectors to unit L2 norm.
       verbose: Whether to log every batch.
       batch_size: Batch size for the encoder.
@@ -255,7 +255,7 @@ class SkipThoughtsEncoder(object):
     for batch, start_index in enumerate(batch_indices):
       if verbose:
         tf.logging.info("Batch %d / %d.", batch, len(batch_indices))
-
+      pdb.set_trace()
       embeddings, mask = _batch_and_pad(
           data[start_index:start_index + batch_size])
       feed_dict = {
