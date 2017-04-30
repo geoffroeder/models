@@ -1,11 +1,11 @@
 #!/bin/bash
-source activate tensorflow
+# source activate tensorflow
 
 # Directory containing the preprocessed data.
-DATA_DIR="/ais/gobi5/roeder/fastText/train"
+DATA_DIR="/home/geoff/gobi5/fastText/mocktrain"
 
 # Directory to save the model.
-MODEL_DIR="/ais/gobi5/roeder/fastText/model"
+MODEL_DIR="/home/geoff/gobi5/fastText/mockmodel"
 
 # Build the model.
 bazel build -c opt skip_thoughts/...

@@ -150,19 +150,18 @@ def _sentence_to_ids(sentence, vocab):
   return ids
 
 
-def _create_serialized_example(predecessor, current, successor, vocab, lang_id):
+def _create_serialized_example(predecessor, current, successor, vocab):
   """Helper for creating a serialized Example proto."""
   example = tf.train.Example(features=tf.train.Features(feature={
       "decode_pre": _int64_feature(_sentence_to_ids(predecessor, vocab)),
       "encode": _int64_feature(_sentence_to_ids(current, vocab)),
-      "decode_post": _int64_feature(_sentence_to_ids(successor, vocab)),
-      "target_lang": _int64_feature([lang_id])
+      "decode_post": _int64_feature(_sentence_to_ids(successor, vocab))
   }))
 
   return example.SerializeToString()
 
 # ** new: accepts lang parameter
-def _process_input_file(filename, vocab, stats, lang_id):
+def _process_input_file(filename, vocab, stats):
     # TODO: still need to modify?
   """Processes the sentences in an input file.
 
@@ -199,7 +198,7 @@ def _process_input_file(filename, vocab, stats, lang_id):
       else:
         # ** new: passes lang variable to function
         serialized = _create_serialized_example(predecessor, current, successor,
-                                                vocab, lang_id)
+                                                vocab)
         processed.append(serialized)
         stats.update(["sentences_output"])
 
@@ -276,8 +275,7 @@ def main(unused_argv):
   dataset = []
   for filename in input_files:
     lang = filename.split(os.sep)[-1]
-    dataset.extend(_process_input_file(filename, vocabs[lang], stats,
-                                       lang_to_id[lang]))
+    dataset.extend(_process_input_file(filename, vocabs[lang], stats))
     if FLAGS.max_sentences and stats["sentences_output"] >= FLAGS.max_sentences:
       break
 
