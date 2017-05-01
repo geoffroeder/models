@@ -43,8 +43,7 @@ import collections
 import os
 
 #** NEW: debug **
-import pdb
-
+from tqdm import tqdm
 import numpy as np
 import tensorflow as tf
 
@@ -123,14 +122,19 @@ def _build_vocabularies():
         print("Working on %s" % vocab_file)
         vocab = vocabs[vocab_file] # name is index
         with tf.gfile.GFile(FLAGS.vocabs_dir + vocab_file, mode="r") as f:
-          for i, line in enumerate(f):
+          i=0  
+          for _, line in tqdm(enumerate(f)):
             word = line.decode('utf-8').strip()
             if word in vocab:
                 # Kludge: what is happening during conversion to cause this?
                 # We lost no more than 7 words this way, only in some languages
-                "Attempting to add word twice: %sl" % word
+                tf.logging.info("Attempting to add word twice: %s" % word)
             else:
                 vocab[word] = i
+                i=i+1
+            if FLAGS.num_words == len(vocab):
+                tf.logging.info("Read up to max vocab, stopping read loop")
+                break
         tf.logging.info("Read vocab of size %d from %s", len(vocab), vocab_file)
     return vocabs
 
